@@ -8,6 +8,14 @@ using MQTTnet;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Configure Kestrel for high connection count
+builder.WebHost.ConfigureKestrel(serverOptions =>
+{
+    serverOptions.Limits.MaxConcurrentConnections = null; // Unlimited
+    serverOptions.Limits.MaxConcurrentUpgradedConnections = null; // Unlimited
+    serverOptions.ListenAnyIP(5000); // Bind to port 5000 on all interfaces
+});
+
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 
@@ -35,10 +43,10 @@ var app = builder.Build();
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
-    app.UseHsts();
 }
 
-app.UseHttpsRedirection();
+// Don't use HTTPS redirection for MQTT/WebSocket connections
+// app.UseHttpsRedirection();
 app.UseRouting();
 
 app.UseAuthorization();

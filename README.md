@@ -143,16 +143,37 @@ TOTAL_DEVICES=1000 REPORT_INTERVAL=10 dotnet run
 - 网络: 高带宽连接
 - OS: Linux推荐（更好的网络栈性能）
 
-### 系统调优（Linux）
+### 系统调优（Linux）- **必须执行！**
 
+⚠️ **重要**: 不执行系统调优会导致连接数停在约15,568个（临时端口耗尽）
+
+**快速调优（推荐）:**
+```bash
+# 使用提供的脚本一键调优
+sudo ./tune-system.sh
+```
+
+**手动调优:**
 ```bash
 # 增加文件描述符限制
 ulimit -n 2100000
 
-# 调整TCP参数
+# 扩展临时端口范围（解决15k连接限制）
 sudo sysctl -w net.ipv4.ip_local_port_range="1024 65535"
+
+# 启用TIME_WAIT重用（关键！）
 sudo sysctl -w net.ipv4.tcp_tw_reuse=1
+
+# 减少TIME_WAIT超时
+sudo sysctl -w net.ipv4.tcp_fin_timeout=15
+
+# 增加TIME_WAIT桶数
+sudo sysctl -w net.ipv4.tcp_max_tw_buckets=2000000
 ```
+
+**常见问题**: 
+- **连接数停在15,568左右？** → 系统临时端口耗尽，执行上述调优
+- 详见 [QUICKSTART.md](QUICKSTART.md) 的故障排查部分
 
 ## 开发
 

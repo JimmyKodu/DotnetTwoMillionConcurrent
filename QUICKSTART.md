@@ -60,15 +60,45 @@ TOTAL_DEVICES=100000 REPORT_INTERVAL=60 CONNECTIONS_PER_SECOND=1000 dotnet run
 
 **注意**: 需要充足的系统资源！
 
-### 系统准备
+### 系统准备（必需！）
+
+**重要**: 15,568个连接限制通常是由于系统默认配置导致的。必须执行系统调优才能支持大规模连接。
 
 ```bash
-# Linux 系统调优
+# 使用提供的系统调优脚本（推荐）
+sudo ./tune-system.sh
+
+# 或手动执行以下命令
+# 1. 增加文件描述符限制
 ulimit -n 2100000
+
+# 2. 扩展临时端口范围（解决15k连接限制的关键）
 sudo sysctl -w net.ipv4.ip_local_port_range="1024 65535"
+
+# 3. 启用TIME_WAIT套接字重用（非常重要！）
 sudo sysctl -w net.ipv4.tcp_tw_reuse=1
+
+# 4. 减少TIME_WAIT超时时间
+sudo sysctl -w net.ipv4.tcp_fin_timeout=15
+
+# 5. 增加其他TCP参数
+sudo sysctl -w net.ipv4.tcp_max_tw_buckets=2000000
 sudo sysctl -w net.core.somaxconn=65535
+sudo sysctl -w net.ipv4.tcp_max_syn_backlog=65535
+
+# 注意：修改后需要重新登录以使ulimit生效
 ```
+
+**为什么会出现15,568连接限制？**
+- 默认临时端口范围：32768-60999（约28k端口）
+- TIME_WAIT状态占用端口
+- 每个出站连接需要一个本地端口
+- 实际可用端口约为15-16k
+
+**解决方案：**
+1. 扩展端口范围到1024-65535（64k端口）
+2. 启用TIME_WAIT重用（tcp_tw_reuse=1）
+3. 减少TIME_WAIT超时时间（tcp_fin_timeout=15）
 
 ### 运行测试
 
@@ -109,10 +139,35 @@ dotnet run
 
 ## 故障排查
 
+### 连接数停在15,000左右不再增长
+
+**症状**: 连接数达到约15,568后不再增加
+
+**原因**: 系统临时端口耗尽（默认范围32768-60999）
+
+**解决方案**:
+1. 运行系统调优脚本: `sudo ./tune-system.sh`
+2. 确认端口范围已扩展:
+   ```bash
+   cat /proc/sys/net/ipv4/ip_local_port_range
+   # 应该显示: 1024 65535
+   ```
+3. 确认TIME_WAIT重用已启用:
+   ```bash
+   cat /proc/sys/net/ipv4/tcp_tw_reuse
+   # 应该显示: 1
+   ```
+4. 检查TIME_WAIT状态的连接数:
+   ```bash
+   netstat -an | grep TIME_WAIT | wc -l
+   ```
+5. 重启设备模拟器
+
 ### 连接失败
 
 如果看到大量连接错误：
-1. 降低 CONNECTIONS_PER_SECOND
+1. 检查是否已运行系统调优脚本
+2. 降低 CONNECTIONS_PER_SECOND
 2. 检查防火墙设置
 3. 确认系统资源充足
 
